@@ -1,30 +1,36 @@
 import argparse
+import copy
+import functools
+import json
 import logging
+import operator
 import os
-import sys
-import warnings
-import pysam
+import random
 import re
 import signal
-import operator
-import functools
-import uuid
-import copy
-import random
-import json
 import subprocess
-
+import sys
+import uuid
+import warnings
+from collections import Counter, defaultdict
 from pathlib import Path
 from time import time
-from sklearn.decomposition import PCA
-from scipy.stats import norm
-from collections import defaultdict, Counter
 
 import numpy as np
+import pysam
+from scipy.stats import norm
+from sklearn.decomposition import PCA
+
+# from wisecondorff import __version__
+
+__author__ = "Tom Okveld, Matthias De Smet"
+__copyright__ = "Tom Okveld, Center for Medical Genetics, Ghent University, Belgium"
+__license__ = "Attribution-NonCommercial-ShareAlike 4.0 International"
 
 logger = logging.getLogger(__name__)
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
+
 
 def profile(f):
     def wrap(*args, **kwargs):
@@ -41,7 +47,9 @@ def profile(f):
         output = f(*args, **kwargs)
         logger.info(f"Ended: {fname}, duration {time() - starting_time}s")
         return output
+
     return wrap
+
 
 def signal_kill(signal, frame):
     print("Killed!")
@@ -53,7 +61,8 @@ signal.signal(signal.SIGINT, signal_kill)
 
 def read_pair_gen(bam_pointer, stats_map, region_str=None):
     """
-    Return read pairs as they are encountered, includes the position of the first previously aligned reads
+    Return read pairs as they are encountered,
+    includes the position of the first previously aligned reads
     """
 
     read_dict = defaultdict(lambda: [None, None])
@@ -183,7 +192,7 @@ def wcr_convert(args):
 
 def scale_sample(sample, from_size, to_size, scaling_function=None):
     if scaling_function is None:
-        logging.critical(f"No scaling function given!")
+        logging.critical("No scaling function given!")
 
     if to_size is None or from_size == to_size:
         return sample
@@ -206,7 +215,9 @@ def scale_sample(sample, from_size, to_size, scaling_function=None):
         new_len = int(np.ceil(len(data) / float(scale)))
         scaled_chrom = []
         for i in range(new_len):
-            scaled_chrom.append(scaling_function(data[int(i * scale) : int((i * scale) + scale)]))
+            scaled_chrom.append(
+                scaling_function(data[int(i * scale) : int((i * scale) + scale)])
+            )
         scaled_sample[chrom] = np.array(scaled_chrom)
 
     return scaled_sample
@@ -521,11 +532,15 @@ def wcr_reference(args):
 
         fs_sample = scale_sample_counter(sample["FS"], sample_binsize, args.binsize)
         clip_sample(fs_sample, clip_lo=args.fs_clip_low, clip_hi=args.fs_clip_high)
-        norm_freq_mask_sample(fs_sample, cutoff=args.rc_clip_norm, min_cutoff=args.rc_clip_abs)
+        norm_freq_mask_sample(
+            fs_sample, cutoff=args.rc_clip_norm, min_cutoff=args.rc_clip_abs
+        )
         freq_to_mean(fs_sample)
 
         fs_samples.append(fs_sample)
-        rc_samples.append(scale_sample_array(sample["RC"], sample_binsize, args.binsize))
+        rc_samples.append(
+            scale_sample_array(sample["RC"], sample_binsize, args.binsize)
+        )
 
     fs_samples = np.array(fs_samples)
     rc_samples = np.array(rc_samples)
@@ -599,7 +614,7 @@ def get_optimal_cutoff(ref_file, repeats):
 
 def normalize_repeat(test_data, ref_file, optimal_cutoff):
     test_copy = np.copy(test_data)
-    for i in range(3): # TODO: Parameter
+    for i in range(3):  # TODO: Parameter
         results_z, results_r, ref_sizes = _normalize_once(
             test_data, test_copy, ref_file, optimal_cutoff
         )
@@ -701,7 +716,9 @@ def log_trans(results, log_r_median):
                 results["results_r"][c][i] = results["results_r"][c][i] - log_r_median
 
 
-def _wcr_detect_wrap(sample, final_dict, rc=False, maskrepeats=5, minrefbins=150, zscore=5):
+def _wcr_detect_wrap(
+    sample, final_dict, rc=False, maskrepeats=5, minrefbins=150, zscore=5
+):
     results_r, results_z, results_w, ref_sizes, m_lr, m_z = normalize(
         maskrepeats, sample, final_dict, rc=rc
     )
@@ -722,7 +739,8 @@ def _wcr_detect_wrap(sample, final_dict, rc=False, maskrepeats=5, minrefbins=150
 
     if np.isnan(results_w).any() or np.isinf(results_w).any():
         logging.warning(
-            "Non-numeric values found in weights -- reference too small. Circular binary segmentation and z-scoring will be unweighted"
+            "Non-numeric values found in weights -- reference too small."
+            "Circular binary segmentation and z-scoring will be unweighted"
         )
         results_w = np.ones(len(results_w))
 
@@ -818,10 +836,12 @@ def exec_R(json_dict):
 
 
 def exec_cbs(rem_input, results):
-    json_cbs_dir = os.path.abspath('test_' + str(uuid.uuid4()) + '_CBS_tmp')
+    json_cbs_dir = os.path.abspath("test_" + str(uuid.uuid4()) + "_CBS_tmp")
 
     json_dict = {
-        "R_script": str(Path(os.path.dirname(os.path.realpath(__file__))).joinpath("include/CBS.R")),
+        "R_script": str(
+            Path(os.path.dirname(os.path.realpath(__file__))).joinpath("include/CBS.R")
+        ),
         "ref_gender": "A",
         "alpha": str(1e-4),
         "binsize": str(rem_input["binsize"]),
@@ -877,11 +897,27 @@ def wcr_detect(args):
     )
 
     clip_sample(fs_sample, clip_lo=args.fs_clip_low, clip_hi=args.fs_clip_high)
-    norm_freq_mask_sample(fs_sample, cutoff=args.rc_clip_norm, min_cutoff=args.rc_clip_abs)
+    norm_freq_mask_sample(
+        fs_sample, cutoff=args.rc_clip_norm, min_cutoff=args.rc_clip_abs
+    )
     freq_to_mean(fs_sample)
 
-    rc_results, rc_rem_input = _wcr_detect_wrap(rc_sample, ref["RC"], rc=True, maskrepeats=args.maskrepeats, minrefbins=args.minrefbins, zscore=args.zscore)
-    fs_results, fs_rem_input = _wcr_detect_wrap(fs_sample, ref["FS"], rc=False, maskrepeats=args.maskrepeats, minrefbins=args.minrefbins, zscore=args.zscore)
+    rc_results, rc_rem_input = _wcr_detect_wrap(
+        rc_sample,
+        ref["RC"],
+        rc=True,
+        maskrepeats=args.maskrepeats,
+        minrefbins=args.minrefbins,
+        zscore=args.zscore,
+    )
+    fs_results, fs_rem_input = _wcr_detect_wrap(
+        fs_sample,
+        ref["FS"],
+        rc=False,
+        maskrepeats=args.maskrepeats,
+        minrefbins=args.minrefbins,
+        zscore=args.zscore,
+    )
 
     _rc_results = get_res_to_nparray(rc_results)
     _fs_results = get_res_to_nparray(fs_results)
@@ -913,7 +949,8 @@ def make_generic(cvalue, func_xs, comp_xs, typecast, message):
     Args:
         cvalue (T): Optional value to compare to with the argument of the inner function
         func_xs (List[func(x: T) -> bool]): Optional list value of functions that are applied onto the argument of the inner function
-        comp_xs (List[func(x: T, y: T) -> bool] or List[func(x: T) -> bool]): List value of functions (two-argument if cvalue is set, otherwise only applied on the argument of the inner function)
+        comp_xs (List[func(x: T, y: T) -> bool] or List[func(x: T) -> bool]):
+        List value of functions (two-argument if cvalue is set, otherwise only applied on the argument of the inner function)
         typecast (T): Typecast argument to cast the argument of the inner function
         message (str): fstring used in error messages should follow the format of {tvalue} {cvalue}
     Returns:
@@ -963,7 +1000,6 @@ check_qual = make_generic(
 
 @profile
 def main():
-    logger = logging.getLogger(__name__)
     logging.basicConfig(
         format="[%(levelname)s - %(asctime)s]: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
