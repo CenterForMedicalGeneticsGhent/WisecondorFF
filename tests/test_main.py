@@ -1,11 +1,15 @@
 # import pytest
+from typer.testing import CliRunner
 
 from wisecondorff.main import (
+    app,
     clip_counter,
     clip_sample,
     convert,
-    convert_bam,
+    convert_reads,
+    convert_txt,
     coverage_normalize_and_mask,
+    detect,
     exec_cbs,
     exec_R,
     freq_mask_sample,
@@ -24,7 +28,6 @@ from wisecondorff.main import (
     inflate_results,
     join_chromosomes,
     log_trans,
-    main,
     make_generic,
     merge_counters,
     merge_dicts,
@@ -36,6 +39,7 @@ from wisecondorff.main import (
     profile,
     project_pc,
     read_pair_gen,
+    reference,
     reference_construct,
     reference_prep,
     res_to_nestedlist,
@@ -46,9 +50,6 @@ from wisecondorff.main import (
     signal_kill,
     split_by_chr,
     train_pca,
-    wcr_convert,
-    wcr_detect,
-    wcr_reference,
 )
 
 __author__ = "Tom Okveld, Matthias De Smet"
@@ -56,13 +57,62 @@ __copyright__ = "Tom Okveld, Center for Medical Genetics, Ghent University, Belg
 __license__ = "Attribution-NonCommercial-ShareAlike 4.0 International"
 
 
-def test_main_convert(capsys):
-    """CLI Tests"""
-    # capsys is a pytest fixture that allows asserts against stdout/stderr
-    # https://docs.pytest.org/en/stable/capture.html
-    main()
-    # captured = capsys.readouterr()
-    # assert "The 7-th Fibonacci number is 13" in captured.out
+runner = CliRunner()
+
+
+def test_app():
+    """
+    Test the main CLI.
+    """
+    res = runner.invoke(app, ["--help"])
+    assert res.exit_code == 0
+
+
+def test_app_convert():
+    """
+    Test the convert CLI.
+    """
+    res = runner.invoke(app, ["convert", "--help"])
+    assert res.exit_code == 0
+
+
+def test_app_reference():
+    """
+    Test the reference CLI.
+    """
+    res = runner.invoke(app, ["reference", "--help"])
+    assert res.exit_code == 0
+
+
+def test_app_detect():
+    """
+    Test the detect CLI.
+    """
+    res = runner.invoke(app, ["detect", "--help"])
+    assert res.exit_code == 0
+
+
+def test_convert():
+    """
+    Test the main convert function.
+    """
+    convert()
+    pass
+
+
+def test_reference():
+    """
+    Test the main reference function
+    """
+    reference()
+    pass
+
+
+def test_detect():
+    """
+    Test the main detect function
+    """
+    detect()
     pass
 
 
@@ -81,13 +131,13 @@ def test_read_pair_gen():
     pass  # TODO: test read_pair_gen
 
 
-def test_convert_bam():
-    convert_bam()
-    pass  # TODO: test convert_bam
+def test_convert_reads():
+    convert_reads()
+    pass  # TODO: test convert_reads
 
 
-def test_wcr_convert():
-    wcr_convert()
+def test_convert_txt():
+    convert_txt()
     pass  # TODO: test wcr_convert
 
 
@@ -161,11 +211,6 @@ def test_freq_to_median():
     pass  # TODO: test freq_to_median
 
 
-def test_convert():
-    convert()
-    pass  # TODO: test convert
-
-
 def test_natural_sort():
     natural_sort()
     pass  # TODO: test natural_sort
@@ -209,11 +254,6 @@ def test_split_by_chr():
 def test_reference_construct():
     reference_construct()
     pass  # TODO: test reference_construct
-
-
-def test_wcr_reference():
-    wcr_reference()
-    pass  # TODO: test wcr_reference
 
 
 def test_coverage_normalize_and_mask():
@@ -289,11 +329,6 @@ def test_exec_cbs():
 def test_generate_segments():
     generate_segments()
     pass  # TODO: test generate_segments
-
-
-def test_wcr_detect():
-    wcr_detect
-    pass  # TODO: test wcr_detect
 
 
 def test_make_generic():
